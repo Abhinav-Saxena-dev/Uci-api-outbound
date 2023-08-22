@@ -131,6 +131,11 @@ public class NotificationConsumerReactive {
                 XMessageDAO dao = null;
                 dao = XMessageDAOUtils.convertXMessageToDAO(xMessage);
                 redisCacheService.setXMessageDaoCache(xMessage.getTo().getUserID(), dao);
+                /**
+                 * Setting xmessage in cache
+                 * for Delivery Report Uses
+                 */
+                setDaoInRedisForDeliveryReport(dao);
                 xMessageRepo
                         .insert(dao)
                         .doOnError(new Consumer<Throwable>() {
@@ -143,8 +148,8 @@ public class NotificationConsumerReactive {
                         .subscribe(new Consumer<XMessageDAO>() {
                             @Override
                             public void accept(XMessageDAO xMessageDAO) {
-                                log.info("NotificationConsumerReactive: XMessage Object saved is with sent user ID >> " + xMessageDAO.getUserId());
-
+                                log.info("NotificationConsumerReactive: XMessage Object saved is with sent user ID >> " + xMessageDAO.getUserId() + " : cass id : " + xMessageDAO.getId());
+                              
                                 String channel = xMessage.getChannelURI();
                                 String provider = xMessage.getProviderURI();
 
@@ -198,5 +203,15 @@ public class NotificationConsumerReactive {
                 .attachments(attachments)
                 .build();
         emailService.sendMailWithAttachment(emailDetails);
+    }
+
+    private void setDaoInRedisForDeliveryReport(XMessageDAO xMessageDAO) {
+        if (xMessageDAO != null && xMessageDAO.getMessageId() != null && !xMessageDAO.getMessageId().isEmpty() &&
+                xMessageDAO.getUserId() != null && !xMessageDAO.getUserId().isEmpty()) {
+            redisCacheService.setCache(xMessageDAO.getMessageId() + "_" + xMessageDAO.getUserId(), xMessageDAO);
+        } else {
+            log.error("NotificationConsumerReactive:saveXMessage:: MessageId or UserId not found..." + xMessageDAO);
+        }
+
     }
 }
